@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>退休倒數計時器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        input[type="number"]::-webkit-inner-spin-button,
+        input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="glass w-full max-w-2xl rounded-2xl shadow-xl overflow-hidden">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white text-center">
+            <h1 class="text-3xl font-bold tracking-wider mb-2">退休倒數計時器</h1>
+            <p class="text-blue-100 text-sm">邁向自由的每一天都值得期待</p>
+        </div>
+
+        <div class="p-6 space-y-6">
+            
+            <!-- Result Display -->
+            <div id="result-panel" class="bg-blue-50 border-l-4 border-blue-500 p-6 rounded-r-lg shadow-sm text-center">
+                <h2 class="text-gray-600 font-medium mb-2">距離退休還有</h2>
+                <div class="text-4xl md:text-5xl font-bold text-gray-800 my-3">
+                    <span id="display-days" class="text-blue-600">?</span> 天 
+                    <span id="display-hours" class="text-blue-600">?</span> 時
+                </div>
+                <div class="text-gray-500 text-sm">
+                    (<span id="display-minutes">?</span> 分 <span id="display-seconds">?</span> 秒)
+                </div>
+                <div id="debug-info" class="text-xs text-gray-400 mt-2 hidden">
+                    有效天數計算中...
+                </div>
+            </div>
+
+            <!-- Settings Form -->
+            <div class="space-y-4">
+                
+                <!-- 1. Target Date -->
+                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                    <label class="block text-gray-700 font-bold mb-2 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        設定退休日期與時間
+                    </label>
+                    <input type="datetime-local" id="targetDate" class="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none transition-colors">
+                </div>
+
+                <!-- 2. Weekend Options -->
+                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                    <label class="block text-gray-700 font-bold mb-2 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        週末設定
+                    </label>
+                    <div class="flex space-x-6">
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="radio" name="weekendOption" value="include" class="form-radio text-blue-600" checked>
+                            <span class="ml-2 text-gray-700">包含週末 (自然日)</span>
+                        </label>
+                        <label class="inline-flex items-center cursor-pointer">
+                            <input type="radio" name="weekendOption" value="exclude" class="form-radio text-blue-600">
+                            <span class="ml-2 text-gray-700">扣掉週末 (工作日)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 3. Holidays -->
+                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="enableHolidays" class="form-checkbox text-blue-600 rounded">
+                            <span class="ml-2 text-gray-700 font-bold">扣掉國定假日</span>
+                        </label>
+                    </div>
+                    <div id="holidaySection" class="hidden mt-2">
+                        <!-- Toolbar for Import -->
+                        <div class="flex flex-wrap gap-2 mb-2">
+                             <button type="button" onclick="importHolidays(2026)" class="text-xs bg-indigo-100 hover:bg-indigo-200 text-indigo-800 px-3 py-1 rounded transition-colors flex items-center">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                匯入 2026 台灣假日
+                            </button>
+                             <button type="button" onclick="clearHolidays()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1 rounded transition-colors">
+                                清空
+                            </button>
+                        </div>
+
+                        <p class="text-xs text-gray-500 mb-1">輸入日期 (YYYY-MM-DD)，多個日期請換行或用逗號分隔</p>
+                        <textarea id="holidaysInput" rows="5" class="w-full p-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono" placeholder="2026-01-01&#10;2026-02-17"></textarea>
+                        <p class="text-xs text-gray-400 mt-1 text-right">* 依人事行政總處公告：2026年(民國115年)無補班日</p>
+                    </div>
+                </div>
+
+                <!-- 4. Vacations (Winter/Summer) -->
+                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="enableVacations" class="form-checkbox text-blue-600 rounded">
+                            <span class="ml-2 text-gray-700 font-bold">扣掉寒暑假</span>
+                        </label>
+                    </div>
+                    
+                    <div id="vacationSection" class="hidden space-y-3 mt-2">
+                        <!-- Winter -->
+                        <div class="bg-gray-50 p-3 rounded">
+                            <span class="text-sm font-semibold text-gray-600 block mb-1">寒假範圍 (每年)</span>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="winterStartM" placeholder="月" class="w-12 p-1 border rounded text-center" min="1" max="12">
+                                <span>/</span>
+                                <input type="number" id="winterStartD" placeholder="日" class="w-12 p-1 border rounded text-center" min="1" max="31">
+                                <span class="text-gray-400">至</span>
+                                <input type="number" id="winterEndM" placeholder="月" class="w-12 p-1 border rounded text-center" min="1" max="12">
+                                <span>/</span>
+                                <input type="number" id="winterEndD" placeholder="日" class="w-12 p-1 border rounded text-center" min="1" max="31">
+                            </div>
+                        </div>
+                        <!-- Summer -->
+                        <div class="bg-gray-50 p-3 rounded">
+                            <span class="text-sm font-semibold text-gray-600 block mb-1">暑假範圍 (每年)</span>
+                            <div class="flex items-center space-x-2">
+                                <input type="number" id="summerStartM" placeholder="月" class="w-12 p-1 border rounded text-center" min="1" max="12">
+                                <span>/</span>
+                                <input type="number" id="summerStartD" placeholder="日" class="w-12 p-1 border rounded text-center" min="1" max="31">
+                                <span class="text-gray-400">至</span>
+                                <input type="number" id="summerEndM" placeholder="月" class="w-12 p-1 border rounded text-center" min="1" max="12">
+                                <span>/</span>
+                                <input type="number" id="summerEndD" placeholder="日" class="w-12 p-1 border rounded text-center" min="1" max="31">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="bg-gray-100 p-4 text-center border-t border-gray-200">
+            <button onclick="startCalculation()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-8 rounded-full transition-transform transform hover:scale-105 shadow-lg">
+                重新計算 / 保存設定
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- 變數與設定 ---
+        let timerInterval;
+
+        // --- 初始化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            setupEventListeners();
+            startCalculation(); // 頁面載入時嘗試計算
+        });
+
+        function setupEventListeners() {
+            // UI Toggle Logic
+            document.getElementById('enableHolidays').addEventListener('change', (e) => {
+                document.getElementById('holidaySection').classList.toggle('hidden', !e.target.checked);
+                startCalculation();
+            });
+            document.getElementById('enableVacations').addEventListener('change', (e) => {
+                document.getElementById('vacationSection').classList.toggle('hidden', !e.target.checked);
+                startCalculation();
+            });
+
+            // 即時更新
+            const inputs = document.querySelectorAll('input, textarea, select');
+            inputs.forEach(el => el.addEventListener('change', startCalculation));
+            document.getElementById('targetDate').addEventListener('input', startCalculation);
+        }
+
+        // --- 匯入假日功能 ---
+        function importHolidays(year) {
+            const holidays2026 = [
+                "2026-01-01", // 元旦
+                "2026-02-16", // 農曆除夕
+                "2026-02-17", // 春節
+                "2026-02-18", // 春節
+                "2026-02-19", // 春節
+                "2026-02-20", // 小年夜補假 (因2/15適逢週日)
+                "2026-02-27", // 228和平紀念日補假 (因2/28適逢週六)
+                "2026-04-03", // 兒童節補假 (因4/4適逢週六)
+                "2026-04-06", // 清明節補假 (因4/5適逢週日)
+                "2026-05-01", // 勞動節 (週五)
+                "2026-06-19", // 端午節 (週五)
+                "2026-09-25", // 中秋節 (週五)
+                "2026-10-09"  // 國慶日補假 (因10/10適逢週六)
+            ];
+
+            const currentText = document.getElementById('holidaysInput').value;
+            const currentSet = new Set(currentText.split(/[\n,]/).map(s => s.trim()).filter(s => s));
+            
+            holidays2026.forEach(date => currentSet.add(date));
+            
+            // 排序並轉回字串
+            const sortedDates = Array.from(currentSet).sort();
+            document.getElementById('holidaysInput').value = sortedDates.join('\n');
+            
+            // 觸發更新
+            startCalculation();
+            alert(`已匯入 ${year} 年台灣國定假日 (人事行政總處公告 + 勞動節)`);
+        }
+
+        function clearHolidays() {
+            if(confirm('確定要清空所有假日設定嗎？')) {
+                document.getElementById('holidaysInput').value = '';
+                startCalculation();
+            }
+        }
+
+        // --- 核心邏輯 ---
+
+        function startCalculation() {
+            saveSettings();
+            
+            if (timerInterval) clearInterval(timerInterval);
+            calculate();
+            timerInterval = setInterval(calculate, 1000);
+        }
+
+        function calculate() {
+            const targetInput = document.getElementById('targetDate').value;
+            if (!targetInput) {
+                updateDisplay(0, 0, 0, 0, false);
+                return;
+            }
+
+            const now = new Date();
+            const target = new Date(targetInput);
+
+            // 檢查是否為有效日期
+            if (isNaN(target.getTime())) {
+                 return; 
+            }
+
+            if (target <= now) {
+                const resultPanel = document.getElementById('result-panel');
+                if (resultPanel) {
+                     resultPanel.innerHTML = '<h2 class="text-2xl font-bold text-green-600">恭喜！您已經退休了！🎉</h2>';
+                }
+                clearInterval(timerInterval);
+                return;
+            }
+
+            // 取得設定
+            const excludeWeekend = document.querySelector('input[name="weekendOption"]:checked').value === 'exclude';
+            const enableHolidays = document.getElementById('enableHolidays').checked;
+            const holidaysText = document.getElementById('holidaysInput').value;
+            const enableVacations = document.getElementById('enableVacations').checked;
+
+            // 解析假日
+            const holidaysSet = new Set();
+            if (enableHolidays && holidaysText) {
+                const lines = holidaysText.split(/[\n,]/);
+                lines.forEach(line => {
+                    const cleanDate = line.trim();
+                    if (cleanDate) holidaysSet.add(cleanDate); 
+                });
+            }
+
+            // 解析寒暑假設定
+            const vacationSettings = {
+                winter: {
+                    startM: parseInt(document.getElementById('winterStartM').value) || 0,
+                    startD: parseInt(document.getElementById('winterStartD').value) || 0,
+                    endM: parseInt(document.getElementById('winterEndM').value) || 0,
+                    endD: parseInt(document.getElementById('winterEndD').value) || 0,
+                },
+                summer: {
+                    startM: parseInt(document.getElementById('summerStartM').value) || 0,
+                    startD: parseInt(document.getElementById('summerStartD').value) || 0,
+                    endM: parseInt(document.getElementById('summerEndM').value) || 0,
+                    endD: parseInt(document.getElementById('summerEndD').value) || 0,
+                }
+            };
+
+            let totalSeconds = 0;
+            
+            let cursor = new Date(now);
+            cursor.setHours(0,0,0,0);
+            
+            const targetEndDay = new Date(target);
+            targetEndDay.setHours(0,0,0,0);
+
+            // 1. 今天
+            if (isValidDay(now, excludeWeekend, holidaysSet, enableVacations, vacationSettings)) {
+                let endOfToday = new Date(now);
+                endOfToday.setHours(23, 59, 59, 999);
+                
+                if (targetEndDay.getTime() === cursor.getTime()) {
+                    totalSeconds += (target - now) / 1000;
+                } else {
+                    totalSeconds += (endOfToday - now) / 1000;
+                }
+            }
+
+            cursor.setDate(cursor.getDate() + 1);
+
+            // 2. 中間天數
+            while (cursor.getTime() < targetEndDay.getTime()) {
+                if (isValidDay(cursor, excludeWeekend, holidaysSet, enableVacations, vacationSettings)) {
+                    totalSeconds += 86400; 
+                }
+                cursor.setDate(cursor.getDate() + 1);
+            }
+
+            // 3. 目標日
+            if (targetEndDay.getTime() > new Date(now).setHours(0,0,0,0)) {
+                if (isValidDay(target, excludeWeekend, holidaysSet, enableVacations, vacationSettings)) {
+                     const startOfTargetDay = new Date(target);
+                     startOfTargetDay.setHours(0,0,0,0);
+                     totalSeconds += (target - startOfTargetDay) / 1000;
+                }
+            }
+
+            if (totalSeconds < 0) totalSeconds = 0;
+
+            const d = Math.floor(totalSeconds / 86400);
+            const h = Math.floor((totalSeconds % 86400) / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = Math.floor(totalSeconds % 60);
+
+            updateDisplay(d, h, m, s, true);
+        }
+
+        function isValidDay(dateObj, excludeWeekend, holidaysSet, enableVacations, vacationSettings) {
+            // 1. 週末
+            if (excludeWeekend) {
+                const day = dateObj.getDay();
+                if (day === 0 || day === 6) return false; 
+            }
+
+            // 2. 國定假日 (本地時間字串比較)
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const dayStr = String(dateObj.getDate()).padStart(2, '0');
+            const localDateStr = `${year}-${month}-${dayStr}`;
+            
+            if (holidaysSet.has(localDateStr)) return false;
+
+            // 3. 寒暑假
+            if (enableVacations) {
+                if (isDateInRanges(dateObj, vacationSettings)) return false;
+            }
+
+            return true;
+        }
+
+        function isDateInRanges(date, settings) {
+            const m = date.getMonth() + 1; 
+            const d = date.getDate();      
+
+            const checkRange = (startM, startD, endM, endD) => {
+                if (startM === 0 || endM === 0) return false; 
+                
+                const currVal = m * 100 + d;
+                const startVal = startM * 100 + startD;
+                const endVal = endM * 100 + endD;
+
+                if (startVal <= endVal) {
+                    return currVal >= startVal && currVal <= endVal;
+                } else {
+                    return currVal >= startVal || currVal <= endVal;
+                }
+            };
+
+            if (checkRange(settings.winter.startM, settings.winter.startD, settings.winter.endM, settings.winter.endD)) return true;
+            if (checkRange(settings.summer.startM, settings.summer.startD, settings.summer.endM, settings.summer.endD)) return true;
+
+            return false;
+        }
+
+        function updateDisplay(d, h, m, s, isActive) {
+            const resultPanel = document.getElementById('result-panel');
+
+            if (!isActive) {
+                if (!resultPanel.innerHTML.includes('請先設定退休日期')) {
+                    resultPanel.innerHTML = '<h2 class="text-xl text-gray-500">請先設定退休日期</h2>';
+                }
+                return;
+            }
+
+            const daysEl = document.getElementById('display-days');
+
+            if (!daysEl) {
+                resultPanel.innerHTML = `
+                    <h2 class="text-gray-600 font-medium mb-2">距離退休還有</h2>
+                    <div class="text-4xl md:text-5xl font-bold text-gray-800 my-3">
+                        <span id="display-days" class="text-blue-600">${d}</span> 天 
+                        <span id="display-hours" class="text-blue-600">${h}</span> 時
+                    </div>
+                    <div class="text-gray-500 text-sm">
+                        (<span id="display-minutes">${m}</span> 分 <span id="display-seconds">${s}</span> 秒)
+                    </div>
+                    <div id="debug-info" class="text-xs text-gray-400 mt-2 hidden">
+                        有效天數計算中...
+                    </div>
+                `;
+                return; 
+            }
+
+            daysEl.innerText = d;
+            document.getElementById('display-hours').innerText = h;
+            document.getElementById('display-minutes').innerText = m;
+            document.getElementById('display-seconds').innerText = s;
+        }
+
+        // --- LocalStorage ---
+        function saveSettings() {
+            const settings = {
+                targetDate: document.getElementById('targetDate').value,
+                weekendOption: document.querySelector('input[name="weekendOption"]:checked').value,
+                enableHolidays: document.getElementById('enableHolidays').checked,
+                holidaysInput: document.getElementById('holidaysInput').value,
+                enableVacations: document.getElementById('enableVacations').checked,
+                winter: {
+                    startM: document.getElementById('winterStartM').value,
+                    startD: document.getElementById('winterStartD').value,
+                    endM: document.getElementById('winterEndM').value,
+                    endD: document.getElementById('winterEndD').value
+                },
+                summer: {
+                    startM: document.getElementById('summerStartM').value,
+                    startD: document.getElementById('summerStartD').value,
+                    endM: document.getElementById('summerEndM').value,
+                    endD: document.getElementById('summerEndD').value
+                }
+            };
+            localStorage.setItem('retirementTimerSettings', JSON.stringify(settings));
+        }
+
+        function loadSettings() {
+            const saved = localStorage.getItem('retirementTimerSettings');
+            if (saved) {
+                const s = JSON.parse(saved);
+                if(s.targetDate) document.getElementById('targetDate').value = s.targetDate;
+                if(s.weekendOption) {
+                    document.querySelector(`input[name="weekendOption"][value="${s.weekendOption}"]`).checked = true;
+                }
+                document.getElementById('enableHolidays').checked = s.enableHolidays || false;
+                if (s.enableHolidays) document.getElementById('holidaySection').classList.remove('hidden');
+                
+                document.getElementById('holidaysInput').value = s.holidaysInput || '';
+                
+                document.getElementById('enableVacations').checked = s.enableVacations || false;
+                if (s.enableVacations) document.getElementById('vacationSection').classList.remove('hidden');
+
+                if (s.winter) {
+                    document.getElementById('winterStartM').value = s.winter.startM;
+                    document.getElementById('winterStartD').value = s.winter.startD;
+                    document.getElementById('winterEndM').value = s.winter.endM;
+                    document.getElementById('winterEndD').value = s.winter.endD;
+                }
+                if (s.summer) {
+                    document.getElementById('summerStartM').value = s.summer.startM;
+                    document.getElementById('summerStartD').value = s.summer.startD;
+                    document.getElementById('summerEndM').value = s.summer.endM;
+                    document.getElementById('summerEndD').value = s.summer.endD;
+                }
+            } else {
+                document.getElementById('winterStartM').value = 1;
+                document.getElementById('winterStartD').value = 21;
+                document.getElementById('winterEndM').value = 2;
+                document.getElementById('winterEndD').value = 10;
+                
+                document.getElementById('summerStartM').value = 7;
+                document.getElementById('summerStartD').value = 1;
+                document.getElementById('summerEndM').value = 8;
+                document.getElementById('summerEndD').value = 29;
+            }
+        }
+    </script>
+</body>
+</html>
